@@ -113,6 +113,7 @@ jobs:
         run: |
           snyk test --severity-threshold=high --file=requirements-dev.txt --package-manager=pip
 
+
   build_and_scan_image:
     name: Build & Scan Docker Image
     runs-on: ubuntu-latest
