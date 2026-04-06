@@ -1,11 +1,12 @@
-# HSP Dispatch Service Template
+# HSP Dispatch Service
 
-Python 后端模板，提供同一业务能力的 HTTP + gRPC 双入口，采用共享 `service + model`、分离 transport 的分层结构。
+Python 后端服务，提供同一业务能力的 HTTP + gRPC 双入口，采用共享 `service + model`、分离 transport 的分层结构。
 
 ## 架构
 
 - `domain`：领域模型与错误定义
 - `repository`：仓储接口与实现（MySQL / InMemory）
+- `integration`：外部服务端口与 mock 适配层（order-service / worker-schedule-service）
 - `service`：核心业务逻辑（与 transport 无关）
 - `transport/http`：FastAPI controller、schema、mapper
 - `transport/grpc`：gRPC servicer、mapper
@@ -15,13 +16,18 @@ Python 后端模板，提供同一业务能力的 HTTP + gRPC 双入口，采用
 
 HTTP:
 - `GET /healthz`
-- `POST /api/dispatch/v1/echo`
-- `GET /api/dispatch/v1/echo/{id}`
+- `GET /api/dispatch/v1/workers/available`
+- `POST /api/dispatch/v1/dispatches/manual`
+- `GET /api/dispatch/v1/workers/{worker_id}/pending-dispatches`
+- `POST /api/dispatch/v1/workers/{worker_id}/dispatches/{dispatch_id}/response`
+- `GET /api/dispatch/v1/orders/{order_id}/dispatch-history`
 
 gRPC:
-- `CreateEcho`
-- `GetEcho`
-- `Health`
+- `ListAvailableWorkers`
+- `ManualAssignOrder`
+- `ListWorkerPendingDispatches`
+- `ConfirmWorkerResponse`
+- `GetOrderDispatchHistory`
 
 ## 本地开发
 
@@ -40,7 +46,7 @@ cp .env.example .env
 如果服务在本机运行（`make run`），MySQL 也在本机 Docker 映射端口（如 `127.0.0.1:3306`），请将 `.env` 中的 `HSP_DISPATCH_SERVICE_MYSQL_DSN` 改为：
 
 ```env
-HSP_DISPATCH_SERVICE_MYSQL_DSN=mysql+aiomysql://<username>:<pwd>@127.0.0.1:3306/execution_db
+HSP_DISPATCH_SERVICE_MYSQL_DSN=mysql+aiomysql://<username>:<pwd>@127.0.0.1:3306/dispatch_db
 ```
 
 2. 安装依赖
@@ -79,6 +85,7 @@ curl http://127.0.0.1:8080/healthz
 ```bash
 make lint
 make test-unit
+make test
 make coverage
 make swagger
 ```

@@ -4,9 +4,8 @@ import pytest
 
 from hsp_dispatch_service.bootstrap.container import build_container
 from hsp_dispatch_service.config import get_settings
-from hsp_dispatch_service.domain.models import SourceType
-from hsp_dispatch_service.repository.in_memory import InMemoryEchoRepository
-from hsp_dispatch_service.repository.mysql import SQLAlchemyEchoRepository
+from hsp_dispatch_service.repository.in_memory import InMemoryDispatchRepository
+from hsp_dispatch_service.repository.mysql import SQLAlchemyDispatchRepository
 
 
 @pytest.mark.asyncio
@@ -18,7 +17,7 @@ async def test_build_container_with_mock_repository(monkeypatch: pytest.MonkeyPa
 
     container = await build_container()
 
-    assert isinstance(container.echo_repository, InMemoryEchoRepository)
+    assert isinstance(container.dispatch_repository, InMemoryDispatchRepository)
     assert container.engine is None
     assert container.session_factory is None
 
@@ -38,13 +37,19 @@ async def test_build_container_with_sqlalchemy_repository(
 
     container = await build_container()
 
-    assert isinstance(container.echo_repository, SQLAlchemyEchoRepository)
+    assert isinstance(container.dispatch_repository, SQLAlchemyDispatchRepository)
     assert container.engine is not None
     assert container.session_factory is not None
 
-    created = await container.echo_service.create_echo("from-container", SourceType.HTTP)
-    fetched = await container.echo_service.get_echo(created.id)
-    assert fetched.id == created.id
+    created = await container.dispatch_service.manual_assign_order(
+        order_id="order-container",
+        worker_id="worker-001",
+        operator_id="csr-001",
+    )
+    fetched = await container.dispatch_service.get_order_dispatch_history("order-container")
+
+    assert created.order_id == "order-container"
+    assert len(fetched) == 1
 
     if container.engine is not None:
         await container.engine.dispose()

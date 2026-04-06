@@ -10,10 +10,12 @@ from hsp_dispatch_service.infrastructure.db import (
     create_session_factory,
     init_db,
 )
-from hsp_dispatch_service.repository.in_memory import InMemoryEchoRepository
-from hsp_dispatch_service.repository.interfaces import EchoRepository
-from hsp_dispatch_service.repository.mysql import SQLAlchemyEchoRepository
-from hsp_dispatch_service.service.echo_service import EchoService
+from hsp_dispatch_service.integration.interfaces import OrderClient, WorkerScheduleClient
+from hsp_dispatch_service.integration.mock import MockOrderClient, MockWorkerScheduleClient
+from hsp_dispatch_service.repository.in_memory import InMemoryDispatchRepository
+from hsp_dispatch_service.repository.interfaces import DispatchRepository
+from hsp_dispatch_service.repository.mysql import SQLAlchemyDispatchRepository
+from hsp_dispatch_service.service.dispatch_service import DispatchService
 from hsp_dispatch_service.transport.grpc.server import build_grpc_server
 from hsp_dispatch_service.transport.http.app import create_http_app
 
@@ -23,36 +25,42 @@ class AppContainer:
     settings: Settings
     engine: AsyncEngine | None
     session_factory: async_sessionmaker[AsyncSession] | None
-    echo_repository: EchoRepository
-    echo_service: EchoService
+    dispatch_repository: DispatchRepository
+    order_client: OrderClient
+    worker_schedule_client: WorkerScheduleClient
+    dispatch_service: DispatchService
     http_app: FastAPI
     grpc_server: grpc.aio.Server
 
 
 async def build_container() -> AppContainer:
     settings = get_settings()
-    repository: EchoRepository
+    repository: DispatchRepository
 
     if settings.use_mock_repository:
         engine = None
         session_factory = None
-        repository = InMemoryEchoRepository()
+        repository = InMemoryDispatchRepository()
     else:
         engine = create_engine(settings.mysql_dsn)
         await init_db(engine)
         session_factory = create_session_factory(engine)
-        repository = SQLAlchemyEchoRepository(session_factory)
+        repository = SQLAlchemyDispatchRepository(session_factory)
 
-    echo_service = EchoService(repository)
-    http_app = create_http_app(echo_service)
-    grpc_server = build_grpc_server(settings, echo_service)
+    order_client = MockOrderClient()
+    worker_schedule_client = MockWorkerScheduleClient()
+    dispatch_service = DispatchService(repository, order_client, worker_schedule_client)
+    http_app = create_http_app(dispatch_service)
+    grpc_server = build_grpc_server(settings, dispatch_service)
 
     return AppContainer(
         settings=settings,
         engine=engine,
         session_factory=session_factory,
-        echo_repository=repository,
-        echo_service=echo_service,
+        dispatch_repository=repository,
+        order_client=order_client,
+        worker_schedule_client=worker_schedule_client,
+        dispatch_service=dispatch_service,
         http_app=http_app,
         grpc_server=grpc_server,
     )

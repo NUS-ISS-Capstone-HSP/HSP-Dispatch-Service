@@ -5,31 +5,83 @@
     "version": "0.1.0"
   },
   "paths": {
-    "/api/dispatch/v1/echo": {
-      "post": {
+    "/api/dispatch/v1/workers/available": {
+      "get": {
         "tags": [
-          "echo"
+          "dispatch"
         ],
-        "summary": "Create echo record",
-        "description": "Store an echo message and return the created record.",
-        "operationId": "create_echo_api_v1_echo_post",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateEchoRequest"
-              }
+        "summary": "List available workers",
+        "operationId": "list_available_workers_api_dispatch_v1_workers_available_get",
+        "parameters": [
+          {
+            "name": "service_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Service Type"
             }
           },
-          "required": true
-        },
+          {
+            "name": "region",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Region"
+            }
+          },
+          {
+            "name": "at_time",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "At Time"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          }
+        ],
         "responses": {
-          "201": {
-            "description": "Created echo record.",
+          "200": {
+            "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/EchoRecordResponse"
+                  "$ref": "#/components/schemas/ListAvailableWorkersResponse"
                 }
               }
             }
@@ -37,40 +89,46 @@
           "400": {
             "description": "Business validation failed."
           },
+          "503": {
+            "description": "Dependent service unavailable."
+          },
           "422": {
-            "description": "Request payload validation failed."
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
           }
         }
       }
     },
-    "/api/dispatch/v1/echo/{echo_id}": {
-      "get": {
+    "/api/dispatch/v1/dispatches/manual": {
+      "post": {
         "tags": [
-          "echo"
+          "dispatch"
         ],
-        "summary": "Get echo record by id",
-        "description": "Query a previously created echo record.",
-        "operationId": "get_echo_api_v1_echo__echo_id__get",
-        "parameters": [
-          {
-            "name": "echo_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "description": "Echo record id (UUID).",
-              "title": "Echo Id"
-            },
-            "description": "Echo record id (UUID)."
-          }
-        ],
+        "summary": "Manually assign order",
+        "operationId": "manual_assign_api_dispatch_v1_dispatches_manual_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ManualAssignRequest"
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
-          "200": {
-            "description": "Echo record details.",
+          "201": {
+            "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/EchoRecordResponse"
+                  "$ref": "#/components/schemas/DispatchRecordResponse"
                 }
               }
             }
@@ -79,7 +137,184 @@
             "description": "Business validation failed."
           },
           "404": {
-            "description": "Echo record was not found."
+            "description": "Resource not found."
+          },
+          "409": {
+            "description": "Order already has pending dispatch or worker unavailable."
+          },
+          "503": {
+            "description": "Dependent service unavailable."
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/dispatch/v1/workers/{worker_id}/pending-dispatches": {
+      "get": {
+        "tags": [
+          "dispatch"
+        ],
+        "summary": "List worker pending dispatches",
+        "operationId": "list_pending_dispatches_api_dispatch_v1_workers__worker_id__pending_dispatches_get",
+        "parameters": [
+          {
+            "name": "worker_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Worker id.",
+              "title": "Worker Id"
+            },
+            "description": "Worker id."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DispatchRecordListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Business validation failed."
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/dispatch/v1/workers/{worker_id}/dispatches/{dispatch_id}/response": {
+      "post": {
+        "tags": [
+          "dispatch"
+        ],
+        "summary": "Confirm worker response",
+        "operationId": "confirm_worker_response_api_dispatch_v1_workers__worker_id__dispatches__dispatch_id__response_post",
+        "parameters": [
+          {
+            "name": "worker_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Worker id.",
+              "title": "Worker Id"
+            },
+            "description": "Worker id."
+          },
+          {
+            "name": "dispatch_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Dispatch id.",
+              "title": "Dispatch Id"
+            },
+            "description": "Dispatch id."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WorkerResponseRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DispatchRecordResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Business validation failed."
+          },
+          "404": {
+            "description": "Dispatch not found."
+          },
+          "409": {
+            "description": "Dispatch already responded."
+          },
+          "503": {
+            "description": "Dependent service unavailable."
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/dispatch/v1/orders/{order_id}/dispatch-history": {
+      "get": {
+        "tags": [
+          "dispatch"
+        ],
+        "summary": "Get order dispatch history",
+        "operationId": "get_order_history_api_dispatch_v1_orders__order_id__dispatch_history_get",
+        "parameters": [
+          {
+            "name": "order_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Order id.",
+              "title": "Order Id"
+            },
+            "description": "Order id."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DispatchRecordListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Business validation failed."
           },
           "422": {
             "description": "Validation Error",
@@ -122,62 +357,127 @@
   },
   "components": {
     "schemas": {
-      "CreateEchoRequest": {
+      "AvailableWorkerResponse": {
         "properties": {
-          "message": {
+          "worker_id": {
             "type": "string",
-            "maxLength": 2048,
-            "minLength": 1,
-            "title": "Message",
-            "description": "Message content to be stored as an echo record."
+            "title": "Worker Id",
+            "description": "Worker unique id."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Worker display name."
+          },
+          "skills": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Skills",
+            "description": "Worker skill tags."
+          },
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "description": "Worker status from worker-schedule service."
           }
         },
         "type": "object",
         "required": [
-          "message"
+          "worker_id",
+          "name",
+          "skills",
+          "status"
         ],
-        "title": "CreateEchoRequest",
-        "example": {
-          "message": "Hello from HTTP"
-        }
+        "title": "AvailableWorkerResponse"
       },
-      "EchoRecordResponse": {
+      "DispatchRecordListResponse": {
         "properties": {
-          "id": {
+          "dispatches": {
+            "items": {
+              "$ref": "#/components/schemas/DispatchRecordResponse"
+            },
+            "type": "array",
+            "title": "Dispatches"
+          }
+        },
+        "type": "object",
+        "title": "DispatchRecordListResponse"
+      },
+      "DispatchRecordResponse": {
+        "properties": {
+          "dispatch_id": {
             "type": "string",
-            "title": "Id",
-            "description": "Echo record id (UUID)."
+            "title": "Dispatch Id",
+            "description": "Dispatch record id."
           },
-          "message": {
+          "order_id": {
             "type": "string",
-            "title": "Message",
-            "description": "Stored message."
+            "title": "Order Id",
+            "description": "Order id."
           },
-          "source": {
-            "type": "string",
-            "title": "Source",
-            "description": "Record source. HTTP or GRPC."
+          "attempt_no": {
+            "type": "integer",
+            "title": "Attempt No",
+            "description": "Dispatch attempt sequence per order."
           },
-          "created_at": {
+          "worker_id": {
             "type": "string",
-            "title": "Created At",
-            "description": "Creation time in ISO-8601 format."
+            "title": "Worker Id",
+            "description": "Assigned worker id."
+          },
+          "operator_id": {
+            "type": "string",
+            "title": "Operator Id",
+            "description": "Operator (customer service staff) id."
+          },
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "description": "Dispatch status: PENDING/ACCEPTED/REJECTED."
+          },
+          "assigned_at": {
+            "type": "string",
+            "title": "Assigned At",
+            "description": "Assignment time in ISO-8601 format."
+          },
+          "responded_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Responded At",
+            "description": "Worker response time in ISO-8601 format."
+          },
+          "reject_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reject Reason",
+            "description": "Worker reject reason if rejected."
           }
         },
         "type": "object",
         "required": [
-          "id",
-          "message",
-          "source",
-          "created_at"
+          "dispatch_id",
+          "order_id",
+          "attempt_no",
+          "worker_id",
+          "operator_id",
+          "status",
+          "assigned_at"
         ],
-        "title": "EchoRecordResponse",
-        "example": {
-          "created_at": "2026-03-18T12:34:56+00:00",
-          "id": "6f88f9f2-65fd-4ef7-80de-2c96d8ab7b5b",
-          "message": "Hello from HTTP",
-          "source": "HTTP"
-        }
+        "title": "DispatchRecordResponse"
       },
       "HTTPValidationError": {
         "properties": {
@@ -191,6 +491,53 @@
         },
         "type": "object",
         "title": "HTTPValidationError"
+      },
+      "ListAvailableWorkersResponse": {
+        "properties": {
+          "workers": {
+            "items": {
+              "$ref": "#/components/schemas/AvailableWorkerResponse"
+            },
+            "type": "array",
+            "title": "Workers"
+          }
+        },
+        "type": "object",
+        "title": "ListAvailableWorkersResponse"
+      },
+      "ManualAssignRequest": {
+        "properties": {
+          "order_id": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Order Id"
+          },
+          "worker_id": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Worker Id"
+          },
+          "operator_id": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Operator Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "order_id",
+          "worker_id",
+          "operator_id"
+        ],
+        "title": "ManualAssignRequest",
+        "example": {
+          "operator_id": "csr-001",
+          "order_id": "order-1001",
+          "worker_id": "worker-001"
+        }
       },
       "ValidationError": {
         "properties": {
@@ -215,6 +562,13 @@
           "type": {
             "type": "string",
             "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
           }
         },
         "type": "object",
@@ -224,6 +578,36 @@
           "type"
         ],
         "title": "ValidationError"
+      },
+      "WorkerResponseRequest": {
+        "properties": {
+          "response": {
+            "type": "string",
+            "pattern": "^(ACCEPT|REJECT)$",
+            "title": "Response"
+          },
+          "reject_reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2048
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reject Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "response"
+        ],
+        "title": "WorkerResponseRequest",
+        "example": {
+          "reject_reason": "busy with previous order",
+          "response": "REJECT"
+        }
       }
     }
   }

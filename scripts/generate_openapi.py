@@ -1,15 +1,21 @@
 import json
 from pathlib import Path
 
-from hsp_dispatch_service.repository.in_memory import InMemoryEchoRepository
-from hsp_dispatch_service.service.echo_service import EchoService
+from hsp_dispatch_service.integration.mock import MockOrderClient, MockWorkerScheduleClient
+from hsp_dispatch_service.repository.in_memory import InMemoryDispatchRepository
+from hsp_dispatch_service.service.dispatch_service import DispatchService
 from hsp_dispatch_service.transport.http.app import create_http_app
 
 OUTPUT_PATH = Path("docs/openapi.json")
 
 
 def main() -> None:
-    app = create_http_app(EchoService(InMemoryEchoRepository()))
+    service = DispatchService(
+        repository=InMemoryDispatchRepository(),
+        order_client=MockOrderClient(),
+        worker_schedule_client=MockWorkerScheduleClient(),
+    )
+    app = create_http_app(service)
     schema = app.openapi()
 
     OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
