@@ -8,3 +8,11 @@ class ValidationError(DomainError):
 
 class NotFoundError(DomainError):
     """Raised when entity does not exist."""
+
+
+class ConflictError(DomainError):
+    """Raised when business state conflict happens."""
+
+
+class ExternalServiceError(DomainError):
+    """Raised when external service call fails."""

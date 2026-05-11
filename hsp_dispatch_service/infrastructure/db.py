@@ -20,7 +20,7 @@ def create_session_factory(engine: AsyncEngine) -> async_sessionmaker[AsyncSessi
 
 
 async def init_db(engine: AsyncEngine) -> None:
-    from hsp_dispatch_service.infrastructure.orm import EchoRecordORM  # noqa: F401
+    from hsp_dispatch_service.infrastructure.orm import DispatchRecordORM  # noqa: F401
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)

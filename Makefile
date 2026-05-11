@@ -20,7 +20,9 @@ coverage:
 	pytest --cov=hsp_dispatch_service --cov-report=term-missing --cov-fail-under=70 -q
 
 proto-gen:
-	$(PYTHON) -m grpc_tools.protoc -I . --python_out=. --grpc_python_out=. rpc/echo/v1/echo.proto
+	$(PYTHON) -m grpc_tools.protoc -I . --python_out=. --grpc_python_out=. \
+		rpc/echo/v1/echo.proto \
+		rpc/dispatch/v1/dispatch.proto
 
 swagger:
 	$(PYTHON) -m scripts.generate_openapi
