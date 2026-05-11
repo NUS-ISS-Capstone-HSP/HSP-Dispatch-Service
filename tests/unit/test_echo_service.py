@@ -1,6 +1,6 @@
 import pytest
 
-from hsp_dispatch_service.domain.errors import ConflictError, ExternalServiceError
+from hsp_dispatch_service.domain.errors import ConflictError, ExternalServiceError, ValidationError
 from hsp_dispatch_service.domain.models import DispatchStatus, WorkerResponse
 from hsp_dispatch_service.integration.mock import MockOrderClient, MockWorkerScheduleClient
 from hsp_dispatch_service.repository.in_memory import InMemoryDispatchRepository
@@ -20,6 +20,22 @@ async def test_manual_assign_success() -> None:
     assert created.order_id == "order-1"
     assert created.status == DispatchStatus.PENDING
     assert created.attempt_no == 1
+
+
+@pytest.mark.asyncio
+async def test_manual_assign_does_not_call_reserve_worker() -> None:
+    worker_client = MockWorkerScheduleClient()
+    worker_client.fail_next("reserve_worker")
+    service = DispatchService(
+        repository=InMemoryDispatchRepository(),
+        order_client=MockOrderClient(),
+        worker_schedule_client=worker_client,
+    )
+
+    created = await service.manual_assign_order("order-1b", "worker-001", "csr-001")
+
+    assert created.order_id == "order-1b"
+    assert created.status == DispatchStatus.PENDING
 
 
 @pytest.mark.asyncio
@@ -55,6 +71,27 @@ async def test_reject_then_reassign_attempt_increment() -> None:
 
     assert rejected.status == DispatchStatus.REJECTED
     assert second.attempt_no == 2
+
+
+@pytest.mark.asyncio
+async def test_reject_response_does_not_call_release_worker() -> None:
+    worker_client = MockWorkerScheduleClient()
+    worker_client.fail_next("release_worker")
+    service = DispatchService(
+        repository=InMemoryDispatchRepository(),
+        order_client=MockOrderClient(),
+        worker_schedule_client=worker_client,
+    )
+
+    created = await service.manual_assign_order("order-2b", "worker-001", "csr-001")
+    rejected = await service.confirm_worker_response(
+        dispatch_id=created.id,
+        worker_id="worker-001",
+        response=WorkerResponse.REJECT,
+        reject_reason="busy",
+    )
+
+    assert rejected.status == DispatchStatus.REJECTED
 
 
 @pytest.mark.asyncio
@@ -98,3 +135,30 @@ async def test_manual_assign_external_failure_compensated() -> None:
 
     assert "worker-001" in worker_ids
     assert history == []
+
+
+@pytest.mark.asyncio
+async def test_list_dispatches_success() -> None:
+    service = DispatchService(
+        repository=InMemoryDispatchRepository(),
+        order_client=MockOrderClient(),
+        worker_schedule_client=MockWorkerScheduleClient(),
+    )
+    await service.manual_assign_order("order-list-1", "worker-001", "csr-001")
+
+    records = await service.list_dispatches(limit=10, offset=0)
+
+    assert len(records) == 1
+    assert records[0].order_id == "order-list-1"
+
+
+@pytest.mark.asyncio
+async def test_list_dispatches_invalid_limit_raises_validation_error() -> None:
+    service = DispatchService(
+        repository=InMemoryDispatchRepository(),
+        order_client=MockOrderClient(),
+        worker_schedule_client=MockWorkerScheduleClient(),
+    )
+
+    with pytest.raises(ValidationError):
+        await service.list_dispatches(limit=0, offset=0)

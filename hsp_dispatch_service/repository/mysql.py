@@ -131,6 +131,18 @@ class SQLAlchemyDispatchRepository(DispatchRepository):
             rows = result.scalars().all()
         return [_to_domain(row) for row in rows]
 
+    async def list_all(self, limit: int, offset: int) -> list[DispatchRecord]:
+        async with self._session_factory() as session:
+            stmt = (
+                select(DispatchRecordORM)
+                .order_by(DispatchRecordORM.assigned_at.desc())
+                .offset(offset)
+                .limit(limit)
+            )
+            result = await session.execute(stmt)
+            rows = result.scalars().all()
+        return [_to_domain(row) for row in rows]
+
 
 def _to_domain(row: DispatchRecordORM) -> DispatchRecord:
     assigned_at = _ensure_tz(row.assigned_at)

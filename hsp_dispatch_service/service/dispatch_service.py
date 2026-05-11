@@ -63,14 +63,8 @@ class DispatchService:
         attempt_no = await self._repository.get_latest_attempt_no(normalized_order_id) + 1
         assigned_at = datetime.now(UTC)
 
-        worker_reserved = False
         order_marked = False
         try:
-            await self._worker_schedule_client.reserve_worker(
-                normalized_worker_id,
-                normalized_order_id,
-            )
-            worker_reserved = True
             await self._order_client.mark_order_dispatched(
                 normalized_order_id,
                 normalized_worker_id,
@@ -84,15 +78,13 @@ class DispatchService:
                 assigned_at=assigned_at,
             )
         except (ValidationError, NotFoundError, ConflictError):
-            if worker_reserved:
-                await self._safe_release_worker(normalized_worker_id, normalized_order_id)
+            if order_marked:
+                await self._safe_mark_order_pending(normalized_order_id)
             raise
         except Exception as exc:
             await self._compensate_manual_assign(
                 order_id=normalized_order_id,
-                worker_id=normalized_worker_id,
                 order_marked=order_marked,
-                worker_reserved=worker_reserved,
             )
             raise ExternalServiceError("manual dispatch failed and has been compensated") from exc
 
@@ -132,6 +124,15 @@ class DispatchService:
         normalized_order_id = _normalize_required(order_id, "order_id")
         return await self._repository.list_by_order(normalized_order_id)
 
+    async def list_dispatches(self, limit: int, offset: int) -> list[DispatchRecord]:
+        if limit <= 0:
+            raise ValidationError("limit must be greater than 0")
+        if limit > 500:
+            raise ValidationError("limit must not exceed 500")
+        if offset < 0:
+            raise ValidationError("offset must be greater than or equal to 0")
+        return await self._repository.list_all(limit=limit, offset=offset)
+
     async def _handle_accept(self, record: DispatchRecord) -> DispatchRecord:
         responded_at = datetime.now(UTC)
         updated = await self._repository.update_worker_response(
@@ -161,41 +162,20 @@ class DispatchService:
         if updated is None:
             raise NotFoundError(f"dispatch '{record.id}' not found")
 
-        worker_released = False
         try:
-            await self._worker_schedule_client.release_worker(record.worker_id, record.order_id)
-            worker_released = True
             await self._order_client.mark_order_pending_assignment(record.order_id)
             return updated
         except Exception as exc:
-            if worker_released:
-                await self._safe_reserve_worker(record.worker_id, record.order_id)
             await self._safe_revert_pending(record.id)
             raise ExternalServiceError("failed to process reject response") from exc
 
     async def _compensate_manual_assign(
         self,
         order_id: str,
-        worker_id: str,
         order_marked: bool,
-        worker_reserved: bool,
     ) -> None:
         if order_marked:
             await self._safe_mark_order_pending(order_id)
-        if worker_reserved:
-            await self._safe_release_worker(worker_id, order_id)
-
-    async def _safe_release_worker(self, worker_id: str, order_id: str) -> None:
-        try:
-            await self._worker_schedule_client.release_worker(worker_id, order_id)
-        except Exception:
-            pass
-
-    async def _safe_reserve_worker(self, worker_id: str, order_id: str) -> None:
-        try:
-            await self._worker_schedule_client.reserve_worker(worker_id, order_id)
-        except Exception:
-            pass
 
     async def _safe_mark_order_pending(self, order_id: str) -> None:
         try:

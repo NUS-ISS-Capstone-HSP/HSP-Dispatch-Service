@@ -100,3 +100,8 @@ class InMemoryDispatchRepository(DispatchRepository):
             if record.order_id == order_id
         ]
         return sorted(records, key=lambda x: x.attempt_no)
+
+    async def list_all(self, limit: int, offset: int) -> list[DispatchRecord]:
+        records = [deepcopy(record) for record in self._store.values()]
+        records = sorted(records, key=lambda x: x.assigned_at, reverse=True)
+        return records[offset : offset + limit]

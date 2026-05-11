@@ -112,15 +112,33 @@
         ],
         "summary": "Manually assign order",
         "operationId": "manual_assign_api_dispatch_v1_dispatches_manual_post",
+        "parameters": [
+          {
+            "name": "x-user-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Id"
+            }
+          }
+        ],
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/ManualAssignRequest"
               }
             }
-          },
-          "required": true
+          }
         },
         "responses": {
           "201": {
@@ -158,24 +176,29 @@
         }
       }
     },
-    "/api/dispatch/v1/workers/{worker_id}/pending-dispatches": {
+    "/api/dispatch/v1/workers/pending-dispatches": {
       "get": {
         "tags": [
           "dispatch"
         ],
         "summary": "List worker pending dispatches",
-        "operationId": "list_pending_dispatches_api_dispatch_v1_workers__worker_id__pending_dispatches_get",
+        "operationId": "list_pending_dispatches_api_dispatch_v1_workers_pending_dispatches_get",
         "parameters": [
           {
-            "name": "worker_id",
-            "in": "path",
-            "required": true,
+            "name": "x-user-id",
+            "in": "header",
+            "required": false,
             "schema": {
-              "type": "string",
-              "description": "Worker id.",
-              "title": "Worker Id"
-            },
-            "description": "Worker id."
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Id"
+            }
           }
         ],
         "responses": {
@@ -205,25 +228,14 @@
         }
       }
     },
-    "/api/dispatch/v1/workers/{worker_id}/dispatches/{dispatch_id}/response": {
+    "/api/dispatch/v1/dispatches/{dispatch_id}/response": {
       "post": {
         "tags": [
           "dispatch"
         ],
         "summary": "Confirm worker response",
-        "operationId": "confirm_worker_response_api_dispatch_v1_workers__worker_id__dispatches__dispatch_id__response_post",
+        "operationId": "confirm_worker_response_api_dispatch_v1_dispatches__dispatch_id__response_post",
         "parameters": [
-          {
-            "name": "worker_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "description": "Worker id.",
-              "title": "Worker Id"
-            },
-            "description": "Worker id."
-          },
           {
             "name": "dispatch_id",
             "in": "path",
@@ -234,6 +246,22 @@
               "title": "Dispatch Id"
             },
             "description": "Dispatch id."
+          },
+          {
+            "name": "x-user-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-User-Id"
+            }
           }
         ],
         "requestBody": {
@@ -268,6 +296,65 @@
           },
           "503": {
             "description": "Dependent service unavailable."
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/dispatch/v1/dispatches": {
+      "get": {
+        "tags": [
+          "dispatch"
+        ],
+        "summary": "List all dispatch records",
+        "operationId": "list_dispatches_api_dispatch_v1_dispatches_get",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "default": 100,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DispatchRecordListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Business validation failed."
           },
           "422": {
             "description": "Validation Error",
@@ -518,23 +605,15 @@
             "maxLength": 64,
             "minLength": 1,
             "title": "Worker Id"
-          },
-          "operator_id": {
-            "type": "string",
-            "maxLength": 64,
-            "minLength": 1,
-            "title": "Operator Id"
           }
         },
         "type": "object",
         "required": [
           "order_id",
-          "worker_id",
-          "operator_id"
+          "worker_id"
         ],
         "title": "ManualAssignRequest",
         "example": {
-          "operator_id": "csr-001",
           "order_id": "order-1001",
           "worker_id": "worker-001"
         }

@@ -41,3 +41,6 @@ class DispatchRepository(Protocol):
 
     async def list_by_order(self, order_id: str) -> list[DispatchRecord]:
         ...
+
+    async def list_all(self, limit: int, offset: int) -> list[DispatchRecord]:
+        ...

@@ -68,15 +68,14 @@ Query 参数：
 ### 4.2 手工派单
 
 - 方法：`POST /dispatches/manual`
-- 说明：客服将订单手动派给指定工人。operator_id 是 客服id。
+- 说明：客服将订单手动派给指定工人，`operator_id` 从请求头 `x-user-id` 获取。
 
 请求体：
 
 ```json
 {
   "order_id": "order-1001",
-  "worker_id": "worker-001",
-  "operator_id": "csr-001"
+  "worker_id": "worker-001"
 }
 ```
 
@@ -106,11 +105,11 @@ Query 参数：
 
 ### 4.3 查询工人待确认派单
 
-- 方法：`GET /workers/{worker_id}/pending-dispatches`
-- 说明：移动端轮询该工人的待确认派单
+- 方法：`GET /workers/pending-dispatches`
+- 说明：移动端轮询当前登录工人的待确认派单（`worker_id` 从 `x-user-id` 获取）
 
-路径参数：
-- `worker_id`（必填，string）
+请求头：
+- `x-user-id`（必填，string）
 
 成功响应 `200`：
 
@@ -136,11 +135,10 @@ Query 参数：
 
 ### 4.4 工人接单/拒单确认
 
-- 方法：`POST /workers/{worker_id}/dispatches/{dispatch_id}/response`
-- 说明：工人确认接单或拒单
+- 方法：`POST /dispatches/{dispatch_id}/response`
+- 说明：工人确认接单或拒单（`worker_id` 从 `x-user-id` 获取）
 
 路径参数：
-- `worker_id`（必填，string）
 - `dispatch_id`（必填，string）
 
 请求体：
@@ -173,7 +171,7 @@ Query 参数：
 ```
 
 可能错误：
-- `400` 参数非法或路径中的 `worker_id` 与派单不匹配
+- `400` 参数非法或 `x-user-id` 与派单工人不匹配
 - `404` 派单不存在
 - `409` 派单已响应，不能重复确认
 - `503` 下游服务调用失败
@@ -237,15 +235,34 @@ gRPC 错误码映射：
 - `NOT_FOUND`：资源不存在
 - `FAILED_PRECONDITION`：业务状态冲突
 - `UNAVAILABLE`：依赖服务不可用
+- `UNAUTHENTICATED`：缺少 `x-user-id` 或 `x-user-role` metadata
+- `PERMISSION_DENIED`：角色无权限调用该 RPC
+
+### 5.1 gRPC Metadata 鉴权
+
+所有业务 RPC 通过 metadata 读取网关透传身份：
+- `x-user-id`
+- `x-user-role`
+
+角色权限矩阵（当前实现）：
+- `ListAvailableWorkers`：`customer_service` / `admin`
+- `ManualAssignOrder`：`customer_service` / `admin`
+- `ListWorkerPendingDispatches`：`worker` / `customer_service` / `admin`
+- `ConfirmWorkerResponse`：`worker` / `admin`
+- `GetOrderDispatchHistory`：`customer_service` / `admin`
+
+额外约束：
+- `ListWorkerPendingDispatches` 与 `ConfirmWorkerResponse` 都以 metadata 中 `x-user-id` 作为 worker 身份。
+- `ManualAssignOrder` 以 metadata 中 `x-user-id` 作为 operator 身份。
 
 ## 6. 跨模块交互边界（当前实现）
 
 必须交互：
-- `worker-schedule-service`：可用工人查询、占用工人、释放工人
+- `worker-schedule-service`：可用工人查询
 - `order-service`：派单后状态更新、接单确认、拒单回待重派
 
 不交互：
-- `user-service`（`operator_id` 由请求传入）
+- `user-service`（`operator_id` 不在请求体传入，由网关透传 `x-user-id`）
 - `payment-service`
 - `execution-record-service`
 
@@ -255,18 +272,19 @@ gRPC 错误码映射：
 
 ```bash
 curl -X POST 'http://127.0.0.1:8080/api/dispatch/v1/dispatches/manual' \
+  -H 'x-user-id: csr-001' \
   -H 'Content-Type: application/json' \
   -d '{
     "order_id":"order-1001",
-    "worker_id":"worker-001",
-    "operator_id":"csr-001"
+    "worker_id":"worker-001"
   }'
 ```
 
 ### 7.2 工人拒单
 
 ```bash
-curl -X POST 'http://127.0.0.1:8080/api/dispatch/v1/workers/worker-001/dispatches/{dispatch_id}/response' \
+curl -X POST 'http://127.0.0.1:8080/api/dispatch/v1/dispatches/{dispatch_id}/response' \
+  -H 'x-user-id: worker-001' \
   -H 'Content-Type: application/json' \
   -d '{
     "response":"REJECT",

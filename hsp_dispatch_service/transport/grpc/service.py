@@ -1,6 +1,9 @@
+import logging
+from collections.abc import Iterable
 from datetime import datetime
 
 import grpc
+from google.protobuf.json_format import MessageToDict
 
 from hsp_dispatch_service.domain.errors import (
     ConflictError,
@@ -16,6 +19,8 @@ from hsp_dispatch_service.transport.grpc.mapper import (
 )
 from rpc.dispatch.v1 import dispatch_pb2, dispatch_pb2_grpc
 
+logger = logging.getLogger("uvicorn.error")
+
 
 class DispatchGrpcService(dispatch_pb2_grpc.DispatchServiceServicer):
     def __init__(self, dispatch_service: DispatchService) -> None:
@@ -26,6 +31,8 @@ class DispatchGrpcService(dispatch_pb2_grpc.DispatchServiceServicer):
         request: dispatch_pb2.ListAvailableWorkersRequest,
         context: grpc.aio.ServicerContext,
     ) -> dispatch_pb2.ListAvailableWorkersResponse:
+        _log_grpc_request("ListAvailableWorkers", request, context)
+        await _authorize(context, allowed_roles={"customer_service", "admin"})
         try:
             at_time = datetime.fromisoformat(request.at_time) if request.at_time else None
             workers = await self._dispatch_service.list_available_workers(
@@ -50,11 +57,14 @@ class DispatchGrpcService(dispatch_pb2_grpc.DispatchServiceServicer):
         request: dispatch_pb2.ManualAssignOrderRequest,
         context: grpc.aio.ServicerContext,
     ) -> dispatch_pb2.ManualAssignOrderResponse:
+        _log_grpc_request("ManualAssignOrder", request, context)
+        user_id, _ = await _authorize(context, allowed_roles={"customer_service", "admin"})
+
         try:
             record = await self._dispatch_service.manual_assign_order(
                 order_id=request.order_id,
                 worker_id=request.worker_id,
-                operator_id=request.operator_id,
+                operator_id=user_id,
             )
         except ValidationError as exc:
             await context.abort(grpc.StatusCode.INVALID_ARGUMENT, str(exc))
@@ -72,8 +82,11 @@ class DispatchGrpcService(dispatch_pb2_grpc.DispatchServiceServicer):
         request: dispatch_pb2.ListWorkerPendingDispatchesRequest,
         context: grpc.aio.ServicerContext,
     ) -> dispatch_pb2.ListWorkerPendingDispatchesResponse:
+        _log_grpc_request("ListWorkerPendingDispatches", request, context)
+        user_id, _ = await _authorize(context, allowed_roles={"worker", "admin"})
+
         try:
-            records = await self._dispatch_service.list_worker_pending_dispatches(request.worker_id)
+            records = await self._dispatch_service.list_worker_pending_dispatches(user_id)
         except ValidationError as exc:
             await context.abort(grpc.StatusCode.INVALID_ARGUMENT, str(exc))
 
@@ -86,11 +99,14 @@ class DispatchGrpcService(dispatch_pb2_grpc.DispatchServiceServicer):
         request: dispatch_pb2.ConfirmWorkerResponseRequest,
         context: grpc.aio.ServicerContext,
     ) -> dispatch_pb2.ConfirmWorkerResponseResponse:
+        _log_grpc_request("ConfirmWorkerResponse", request, context)
+        user_id, _ = await _authorize(context, allowed_roles={"worker", "admin"})
+
         try:
             response = to_domain_worker_response(request.response)
             record = await self._dispatch_service.confirm_worker_response(
                 dispatch_id=request.dispatch_id,
-                worker_id=request.worker_id,
+                worker_id=user_id,
                 response=response,
                 reject_reason=request.reject_reason or None,
             )
@@ -112,6 +128,8 @@ class DispatchGrpcService(dispatch_pb2_grpc.DispatchServiceServicer):
         request: dispatch_pb2.GetOrderDispatchHistoryRequest,
         context: grpc.aio.ServicerContext,
     ) -> dispatch_pb2.GetOrderDispatchHistoryResponse:
+        _log_grpc_request("GetOrderDispatchHistory", request, context)
+        await _authorize(context, allowed_roles={"customer_service", "admin"})
         try:
             records = await self._dispatch_service.get_order_dispatch_history(request.order_id)
         except ValidationError as exc:
@@ -120,3 +138,68 @@ class DispatchGrpcService(dispatch_pb2_grpc.DispatchServiceServicer):
         return dispatch_pb2.GetOrderDispatchHistoryResponse(
             dispatches=[to_grpc_dispatch(record) for record in records],
         )
+
+    async def ListDispatches(
+        self,
+        request: dispatch_pb2.ListDispatchesRequest,
+        context: grpc.aio.ServicerContext,
+    ) -> dispatch_pb2.ListDispatchesResponse:
+        _log_grpc_request("ListDispatches", request, context)
+        await _authorize(context, allowed_roles={"customer_service", "admin"})
+        try:
+            records = await self._dispatch_service.list_dispatches(
+                limit=request.limit or 100,
+                offset=request.offset,
+            )
+        except ValidationError as exc:
+            await context.abort(grpc.StatusCode.INVALID_ARGUMENT, str(exc))
+
+        return dispatch_pb2.ListDispatchesResponse(
+            dispatches=[to_grpc_dispatch(record) for record in records],
+        )
+
+
+async def _authorize(
+    context: grpc.aio.ServicerContext,
+    allowed_roles: Iterable[str],
+) -> tuple[str, str]:
+    metadata = _get_metadata_map(context)
+
+    user_id = metadata.get("x-user-id", "").strip()
+    role = metadata.get("x-user-role", "").strip().lower()
+    if not user_id or not role:
+        await context.abort(
+            grpc.StatusCode.UNAUTHENTICATED,
+            "x-user-id and x-user-role are required in metadata",
+        )
+
+    normalized_allowed_roles = {item.strip().lower() for item in allowed_roles}
+    if role not in normalized_allowed_roles:
+        await context.abort(
+            grpc.StatusCode.PERMISSION_DENIED,
+            f"role '{role}' is not allowed for this rpc",
+        )
+    return user_id, role
+
+
+def _get_metadata_map(context: grpc.aio.ServicerContext) -> dict[str, str]:
+    return {key.lower(): value for key, value in context.invocation_metadata()}
+
+
+def _log_grpc_request(
+    rpc_name: str,
+    request: object,
+    context: grpc.aio.ServicerContext,
+) -> None:
+    request_payload = MessageToDict(
+        request,
+        preserving_proto_field_name=True,
+        use_integers_for_enums=False,
+    )
+    metadata = _get_metadata_map(context)
+    logger.info(
+        "GRPC_REQUEST rpc=%s metadata=%s params=%s",
+        rpc_name,
+        metadata,
+        request_payload,
+    )

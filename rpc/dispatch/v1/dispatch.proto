@@ -35,16 +35,13 @@ message ListAvailableWorkersResponse {
 message ManualAssignOrderRequest {
   string order_id = 1;
   string worker_id = 2;
-  string operator_id = 3;
 }
 
 message ManualAssignOrderResponse {
   DispatchRecord dispatch = 1;
 }
 
-message ListWorkerPendingDispatchesRequest {
-  string worker_id = 1;
-}
+message ListWorkerPendingDispatchesRequest {}
 
 message ListWorkerPendingDispatchesResponse {
   repeated DispatchRecord dispatches = 1;
@@ -58,13 +55,21 @@ enum WorkerResponseType {
 
 message ConfirmWorkerResponseRequest {
   string dispatch_id = 1;
-  string worker_id = 2;
   WorkerResponseType response = 3;
   string reject_reason = 4;
 }
 
 message ConfirmWorkerResponseResponse {
   DispatchRecord dispatch = 1;
+}
+
+message ListDispatchesRequest {
+  int32 limit = 1;
+  int32 offset = 2;
+}
+
+message ListDispatchesResponse {
+  repeated DispatchRecord dispatches = 1;
 }
 
 message GetOrderDispatchHistoryRequest {
@@ -80,5 +85,6 @@ service DispatchService {
   rpc ManualAssignOrder(ManualAssignOrderRequest) returns (ManualAssignOrderResponse);
   rpc ListWorkerPendingDispatches(ListWorkerPendingDispatchesRequest) returns (ListWorkerPendingDispatchesResponse);
   rpc ConfirmWorkerResponse(ConfirmWorkerResponseRequest) returns (ConfirmWorkerResponseResponse);
+  rpc ListDispatches(ListDispatchesRequest) returns (ListDispatchesResponse);
   rpc GetOrderDispatchHistory(GetOrderDispatchHistoryRequest) returns (GetOrderDispatchHistoryResponse);
 }

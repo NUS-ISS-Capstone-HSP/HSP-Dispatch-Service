@@ -33,14 +33,12 @@ class ManualAssignRequest(BaseModel):
             "example": {
                 "order_id": "order-1001",
                 "worker_id": "worker-001",
-                "operator_id": "csr-001",
             }
         },
     )
 
     order_id: str = Field(min_length=1, max_length=64)
     worker_id: str = Field(min_length=1, max_length=64)
-    operator_id: str = Field(min_length=1, max_length=64)
 
 
 class WorkerResponseRequest(BaseModel):

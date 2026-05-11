@@ -18,13 +18,15 @@ HTTP:
 - `GET /healthz`
 - `GET /api/dispatch/v1/workers/available`
 - `POST /api/dispatch/v1/dispatches/manual`
-- `GET /api/dispatch/v1/workers/{worker_id}/pending-dispatches`
-- `POST /api/dispatch/v1/workers/{worker_id}/dispatches/{dispatch_id}/response`
+- `GET /api/dispatch/v1/dispatches`
+- `GET /api/dispatch/v1/workers/pending-dispatches`
+- `POST /api/dispatch/v1/dispatches/{dispatch_id}/response`
 - `GET /api/dispatch/v1/orders/{order_id}/dispatch-history`
 
 gRPC:
 - `ListAvailableWorkers`
 - `ManualAssignOrder`
+- `ListDispatches`
 - `ListWorkerPendingDispatches`
 - `ConfirmWorkerResponse`
 - `GetOrderDispatchHistory`

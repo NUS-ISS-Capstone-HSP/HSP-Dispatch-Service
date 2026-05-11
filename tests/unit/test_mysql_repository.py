@@ -70,3 +70,33 @@ async def test_sqlalchemy_repository_update_and_history(tmp_path: Path) -> None:
     assert pending == []
 
     await engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_sqlalchemy_repository_list_all(tmp_path: Path) -> None:
+    db_file = tmp_path / "dispatch-list-all.db"
+    engine = create_engine(f"sqlite+aiosqlite:///{db_file}")
+    await init_db(engine)
+
+    repository = SQLAlchemyDispatchRepository(create_session_factory(engine))
+    await repository.create_dispatch(
+        order_id="order-la-1",
+        attempt_no=1,
+        worker_id="worker-001",
+        operator_id="csr-001",
+        assigned_at=datetime.now(UTC),
+    )
+    await repository.create_dispatch(
+        order_id="order-la-2",
+        attempt_no=1,
+        worker_id="worker-002",
+        operator_id="csr-002",
+        assigned_at=datetime.now(UTC),
+    )
+
+    rows = await repository.list_all(limit=10, offset=0)
+
+    assert len(rows) == 2
+    assert rows[0].assigned_at >= rows[1].assigned_at
+
+    await engine.dispose()

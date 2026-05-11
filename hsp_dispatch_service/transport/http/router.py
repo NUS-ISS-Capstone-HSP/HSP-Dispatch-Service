@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Path, Query
+from fastapi import APIRouter, Header, HTTPException, Path, Query
 
 from hsp_dispatch_service.domain.models import WorkerResponse
 from hsp_dispatch_service.service.dispatch_service import DispatchService
@@ -57,16 +57,20 @@ def build_router(dispatch_service: DispatchService) -> APIRouter:
             503: {"description": "Dependent service unavailable."},
         },
     )
-    async def manual_assign(payload: ManualAssignRequest) -> DispatchRecordResponse:
+    async def manual_assign(
+        payload: ManualAssignRequest,
+        x_user_id: Annotated[str | None, Header(alias="x-user-id")] = None,
+    ) -> DispatchRecordResponse:
+        operator_id = _require_user_id_header(x_user_id)
         record = await dispatch_service.manual_assign_order(
             order_id=payload.order_id,
             worker_id=payload.worker_id,
-            operator_id=payload.operator_id,
+            operator_id=operator_id,
         )
         return to_dispatch_record_response(record)
 
     @router.get(
-        "/workers/{worker_id}/pending-dispatches",
+        "/workers/pending-dispatches",
         response_model=DispatchRecordListResponse,
         summary="List worker pending dispatches",
         responses={
@@ -74,13 +78,14 @@ def build_router(dispatch_service: DispatchService) -> APIRouter:
         },
     )
     async def list_pending_dispatches(
-        worker_id: str = Path(..., description="Worker id."),
+        x_user_id: Annotated[str | None, Header(alias="x-user-id")] = None,
     ) -> DispatchRecordListResponse:
+        worker_id = _require_user_id_header(x_user_id)
         records = await dispatch_service.list_worker_pending_dispatches(worker_id)
         return to_dispatch_record_list_response(records)
 
     @router.post(
-        "/workers/{worker_id}/dispatches/{dispatch_id}/response",
+        "/dispatches/{dispatch_id}/response",
         response_model=DispatchRecordResponse,
         summary="Confirm worker response",
         responses={
@@ -92,9 +97,10 @@ def build_router(dispatch_service: DispatchService) -> APIRouter:
     )
     async def confirm_worker_response(
         payload: WorkerResponseRequest,
-        worker_id: str = Path(..., description="Worker id."),
         dispatch_id: str = Path(..., description="Dispatch id."),
+        x_user_id: Annotated[str | None, Header(alias="x-user-id")] = None,
     ) -> DispatchRecordResponse:
+        worker_id = _require_user_id_header(x_user_id)
         record = await dispatch_service.confirm_worker_response(
             dispatch_id=dispatch_id,
             worker_id=worker_id,
@@ -102,6 +108,21 @@ def build_router(dispatch_service: DispatchService) -> APIRouter:
             reject_reason=payload.reject_reason,
         )
         return to_dispatch_record_response(record)
+
+    @router.get(
+        "/dispatches",
+        response_model=DispatchRecordListResponse,
+        summary="List all dispatch records",
+        responses={
+            400: {"description": "Business validation failed."},
+        },
+    )
+    async def list_dispatches(
+        limit: Annotated[int, Query(ge=1, le=500)] = 100,
+        offset: Annotated[int, Query(ge=0)] = 0,
+    ) -> DispatchRecordListResponse:
+        records = await dispatch_service.list_dispatches(limit=limit, offset=offset)
+        return to_dispatch_record_list_response(records)
 
     @router.get(
         "/orders/{order_id}/dispatch-history",
@@ -118,3 +139,10 @@ def build_router(dispatch_service: DispatchService) -> APIRouter:
         return to_dispatch_record_list_response(records)
 
     return router
+
+
+def _require_user_id_header(x_user_id: str | None) -> str:
+    normalized = (x_user_id or "").strip()
+    if not normalized:
+        raise HTTPException(status_code=401, detail="x-user-id header is required")
+    return normalized

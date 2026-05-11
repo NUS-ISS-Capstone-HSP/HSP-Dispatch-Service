@@ -16,6 +16,11 @@ def build_client() -> TestClient:
     return TestClient(app)
 
 
+CSR_001_HEADERS = {"x-user-id": "csr-001"}
+CSR_002_HEADERS = {"x-user-id": "csr-002"}
+WORKER_001_HEADERS = {"x-user-id": "worker-001"}
+
+
 def test_healthz_success() -> None:
     client = build_client()
 
@@ -41,9 +46,13 @@ def test_manual_assign_and_pending_success() -> None:
 
     assign = client.post(
         "/api/dispatch/v1/dispatches/manual",
-        json={"order_id": "order-http-1", "worker_id": "worker-001", "operator_id": "csr-001"},
+        json={"order_id": "order-http-1", "worker_id": "worker-001"},
+        headers=CSR_001_HEADERS,
     )
-    pending = client.get("/api/dispatch/v1/workers/worker-001/pending-dispatches")
+    pending = client.get(
+        "/api/dispatch/v1/workers/pending-dispatches",
+        headers=WORKER_001_HEADERS,
+    )
 
     assert assign.status_code == 201
     assert assign.json()["status"] == "PENDING"
@@ -56,17 +65,20 @@ def test_confirm_reject_and_reassign_success() -> None:
 
     assign = client.post(
         "/api/dispatch/v1/dispatches/manual",
-        json={"order_id": "order-http-2", "worker_id": "worker-001", "operator_id": "csr-001"},
+        json={"order_id": "order-http-2", "worker_id": "worker-001"},
+        headers=CSR_001_HEADERS,
     )
     dispatch_id = assign.json()["dispatch_id"]
 
     reject = client.post(
-        f"/api/dispatch/v1/workers/worker-001/dispatches/{dispatch_id}/response",
+        f"/api/dispatch/v1/dispatches/{dispatch_id}/response",
         json={"response": "REJECT", "reject_reason": "busy"},
+        headers=WORKER_001_HEADERS,
     )
     reassign = client.post(
         "/api/dispatch/v1/dispatches/manual",
-        json={"order_id": "order-http-2", "worker_id": "worker-001", "operator_id": "csr-002"},
+        json={"order_id": "order-http-2", "worker_id": "worker-001"},
+        headers=CSR_002_HEADERS,
     )
 
     assert reject.status_code == 200
@@ -80,12 +92,41 @@ def test_manual_assign_conflict() -> None:
 
     first = client.post(
         "/api/dispatch/v1/dispatches/manual",
-        json={"order_id": "order-http-3", "worker_id": "worker-001", "operator_id": "csr-001"},
+        json={"order_id": "order-http-3", "worker_id": "worker-001"},
+        headers=CSR_001_HEADERS,
     )
     second = client.post(
         "/api/dispatch/v1/dispatches/manual",
-        json={"order_id": "order-http-3", "worker_id": "worker-002", "operator_id": "csr-002"},
+        json={"order_id": "order-http-3", "worker_id": "worker-002"},
+        headers=CSR_002_HEADERS,
     )
 
     assert first.status_code == 201
     assert second.status_code == 409
+
+
+def test_list_dispatches_success() -> None:
+    client = build_client()
+
+    client.post(
+        "/api/dispatch/v1/dispatches/manual",
+        json={"order_id": "order-http-list-1", "worker_id": "worker-001"},
+        headers=CSR_001_HEADERS,
+    )
+    response = client.get("/api/dispatch/v1/dispatches", params={"limit": 20, "offset": 0})
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert len(payload["dispatches"]) >= 1
+    assert payload["dispatches"][0]["dispatch_id"]
+
+
+def test_manual_assign_requires_user_id_header() -> None:
+    client = build_client()
+
+    response = client.post(
+        "/api/dispatch/v1/dispatches/manual",
+        json={"order_id": "order-http-4", "worker_id": "worker-001"},
+    )
+
+    assert response.status_code == 401

@@ -54,6 +54,11 @@ class DispatchServiceStub(object):
                 request_serializer=rpc_dot_dispatch_dot_v1_dot_dispatch__pb2.ConfirmWorkerResponseRequest.SerializeToString,
                 response_deserializer=rpc_dot_dispatch_dot_v1_dot_dispatch__pb2.ConfirmWorkerResponseResponse.FromString,
                 _registered_method=True)
+        self.ListDispatches = channel.unary_unary(
+                '/dispatch.v1.DispatchService/ListDispatches',
+                request_serializer=rpc_dot_dispatch_dot_v1_dot_dispatch__pb2.ListDispatchesRequest.SerializeToString,
+                response_deserializer=rpc_dot_dispatch_dot_v1_dot_dispatch__pb2.ListDispatchesResponse.FromString,
+                _registered_method=True)
         self.GetOrderDispatchHistory = channel.unary_unary(
                 '/dispatch.v1.DispatchService/GetOrderDispatchHistory',
                 request_serializer=rpc_dot_dispatch_dot_v1_dot_dispatch__pb2.GetOrderDispatchHistoryRequest.SerializeToString,
@@ -88,6 +93,12 @@ class DispatchServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def ListDispatches(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
     def GetOrderDispatchHistory(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
@@ -116,6 +127,11 @@ def add_DispatchServiceServicer_to_server(servicer, server):
                     servicer.ConfirmWorkerResponse,
                     request_deserializer=rpc_dot_dispatch_dot_v1_dot_dispatch__pb2.ConfirmWorkerResponseRequest.FromString,
                     response_serializer=rpc_dot_dispatch_dot_v1_dot_dispatch__pb2.ConfirmWorkerResponseResponse.SerializeToString,
+            ),
+            'ListDispatches': grpc.unary_unary_rpc_method_handler(
+                    servicer.ListDispatches,
+                    request_deserializer=rpc_dot_dispatch_dot_v1_dot_dispatch__pb2.ListDispatchesRequest.FromString,
+                    response_serializer=rpc_dot_dispatch_dot_v1_dot_dispatch__pb2.ListDispatchesResponse.SerializeToString,
             ),
             'GetOrderDispatchHistory': grpc.unary_unary_rpc_method_handler(
                     servicer.GetOrderDispatchHistory,
@@ -231,6 +247,33 @@ class DispatchService(object):
             '/dispatch.v1.DispatchService/ConfirmWorkerResponse',
             rpc_dot_dispatch_dot_v1_dot_dispatch__pb2.ConfirmWorkerResponseRequest.SerializeToString,
             rpc_dot_dispatch_dot_v1_dot_dispatch__pb2.ConfirmWorkerResponseResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ListDispatches(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/dispatch.v1.DispatchService/ListDispatches',
+            rpc_dot_dispatch_dot_v1_dot_dispatch__pb2.ListDispatchesRequest.SerializeToString,
+            rpc_dot_dispatch_dot_v1_dot_dispatch__pb2.ListDispatchesResponse.FromString,
             options,
             channel_credentials,
             insecure,
