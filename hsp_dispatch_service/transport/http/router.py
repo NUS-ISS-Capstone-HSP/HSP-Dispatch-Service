@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime
 from typing import Annotated
 
@@ -17,6 +18,8 @@ from hsp_dispatch_service.transport.http.schemas import (
     ManualAssignRequest,
     WorkerResponseRequest,
 )
+
+logger = logging.getLogger("uvicorn.error")
 
 
 def build_router(dispatch_service: DispatchService) -> APIRouter:
@@ -67,6 +70,13 @@ def build_router(dispatch_service: DispatchService) -> APIRouter:
             worker_id=payload.worker_id,
             operator_id=operator_id,
         )
+        logger.info(
+            "HTTP_MANUAL_ASSIGN_CREATED order_id=%s worker_id=%s operator_id=%s dispatch_id=%s",
+            record.order_id,
+            record.worker_id,
+            operator_id,
+            record.id,
+        )
         return to_dispatch_record_response(record)
 
     @router.get(
@@ -106,6 +116,12 @@ def build_router(dispatch_service: DispatchService) -> APIRouter:
             worker_id=worker_id,
             response=WorkerResponse(payload.response),
             reject_reason=payload.reject_reason,
+        )
+        logger.info(
+            "HTTP_WORKER_RESPONSE_CONFIRMED dispatch_id=%s worker_id=%s response=%s",
+            record.id,
+            worker_id,
+            record.status.value,
         )
         return to_dispatch_record_response(record)
 
