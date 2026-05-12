@@ -6,8 +6,31 @@ on:
   pull_request:
 
 jobs:
-  lint_and_unit:
-    name: Lint & Unit Test
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: Lint
+        run: |
+          ruff check .
+          mypy hsp_dispatch_service
+
+  unit_test:
+    name: Unit Test
     runs-on: ubuntu-latest
 
     services:
@@ -40,18 +63,13 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements-dev.txt
 
-      - name: Lint
-        run: |
-          ruff check .
-          mypy hsp_dispatch_service
-
       - name: Unit test
         run: pytest tests/unit -q
 
-  coverage_and_security:
-    name: Coverage & Dependency Security
+  coverage:
+    name: Coverage
     runs-on: ubuntu-latest
-    needs: lint_and_unit
+    needs: [lint, unit_test]
 
     services:
       mysql:
@@ -86,13 +104,60 @@ jobs:
       - name: Coverage
         run: pytest --cov=hsp_dispatch_service --cov-report=term-missing --cov-fail-under=70 -q
 
+  security_bandit:
+    name: Security - Bandit
+    runs-on: ubuntu-latest
+    needs: [lint, unit_test]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
       - name: Security scan - bandit
         continue-on-error: true
         run: bandit -q -r hsp_dispatch_service
 
+  security_pip_audit:
+    name: Security - pip-audit
+    runs-on: ubuntu-latest
+    needs: [lint, unit_test]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
       - name: Security scan - pip-audit
         continue-on-error: true
         run: pip-audit
+
+  security_trivy:
+    name: Security - Trivy
+    runs-on: ubuntu-latest
+    needs: [lint, unit_test]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
 
       - name: Security scan - trivy
         continue-on-error: true
@@ -104,6 +169,25 @@ jobs:
           format: table
           exit-code: "1"
 
+  security_snyk_dependency:
+    name: Security - Snyk Dependency
+    runs-on: ubuntu-latest
+    needs: [lint, unit_test]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
       - name: Install Snyk CLI
         uses: snyk/actions/setup@master
 
@@ -113,11 +197,30 @@ jobs:
         run: |
           snyk test --severity-threshold=high --file=requirements-dev.txt --package-manager=pip
 
-
-  build_and_scan_image:
-    name: Build & Scan Docker Image
+  build_image:
+    name: Build Docker Image
     runs-on: ubuntu-latest
-    needs: coverage_and_security
+    needs:
+      - coverage
+      - security_bandit
+      - security_pip_audit
+      - security_trivy
+      - security_snyk_dependency
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build docker image
+        run: |
+          REPO_NAME="${GITHUB_REPOSITORY##*/}"
+          REPO_NAME="${REPO_NAME,,}"
+          docker build -t "local/${REPO_NAME}:${GITHUB_SHA}" .
+
+  scan_image:
+    name: Scan Docker Image
+    runs-on: ubuntu-latest
+    needs: build_image
 
     steps:
       - name: Checkout
@@ -143,7 +246,7 @@ jobs:
   push_image:
     name: Push Docker Image
     runs-on: ubuntu-latest
-    needs: build_and_scan_image
+    needs: scan_image
     if: github.ref == 'refs/heads/main'
 
     steps:
