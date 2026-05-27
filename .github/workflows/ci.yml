@@ -64,7 +64,7 @@ jobs:
           pip install -r requirements-dev.txt
 
       - name: Unit test
-        run: pytest tests/unit -q
+        run: pytest tests -q
 
   coverage:
     name: Coverage
