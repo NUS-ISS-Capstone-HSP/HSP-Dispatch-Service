@@ -159,6 +159,20 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Resolve dependencies for Trivy
+        run: |
+          python -m venv /tmp/trivy-venv
+          . /tmp/trivy-venv/bin/activate
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+          mkdir -p .trivy
+          pip freeze > .trivy/requirements.txt
+
       - name: Security scan - trivy
         continue-on-error: true
         uses: aquasecurity/trivy-action@0.35.0
