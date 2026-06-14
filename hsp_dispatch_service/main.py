@@ -4,10 +4,12 @@ from contextlib import suppress
 import uvicorn
 
 from hsp_dispatch_service.bootstrap.container import build_container
+from hsp_dispatch_service.logging import configure_json_logging
 
 
 async def run() -> None:
     container = await build_container()
+    configure_json_logging(container.settings.log_level)
     await container.grpc_server.start()
 
     http_config = uvicorn.Config(
@@ -15,6 +17,7 @@ async def run() -> None:
         host=container.settings.http_host,
         port=container.settings.http_port,
         log_level=container.settings.log_level.lower(),
+        log_config=None,
     )
     http_server = uvicorn.Server(http_config)
 

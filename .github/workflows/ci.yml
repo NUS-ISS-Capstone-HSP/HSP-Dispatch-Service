@@ -200,7 +200,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements-dev.txt
+          pip install -r requirements.txt
 
       - name: Install Snyk CLI
         uses: snyk/actions/setup@master
@@ -209,7 +209,7 @@ jobs:
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         run: |
-          snyk test --severity-threshold=high --file=requirements-dev.txt --package-manager=pip
+          snyk test --severity-threshold=high --file=requirements.txt --package-manager=pip
 
   build_image:
     name: Build Docker Image
