@@ -92,6 +92,10 @@ make coverage
 make swagger
 ```
 
+GitHub Actions 还会启动一个使用内存仓储的隔离服务实例，并通过 OWASP ZAP API
+Scan 对运行时 OpenAPI 接口执行 DAST。扫描报告以 `zap-api-scan` artifact 保存；
+普通告警只进入报告，`.zap/rules.tsv` 中标记为 `FAIL` 的高影响漏洞会阻断镜像构建。
+
 ## Docker
 
 ```bash
@@ -103,5 +107,6 @@ make docker-build
 参考 `.env.example`，关键项：
 - `HSP_DISPATCH_SERVICE_HTTP_HOST` / `HSP_DISPATCH_SERVICE_HTTP_PORT`
 - `HSP_DISPATCH_SERVICE_GRPC_HOST` / `HSP_DISPATCH_SERVICE_GRPC_PORT`
+- `HSP_DISPATCH_SERVICE_LOG_LEVEL` / `HSP_DISPATCH_SERVICE_LOG_DIR`
 - `HSP_DISPATCH_SERVICE_MYSQL_DSN`
 - `HSP_DISPATCH_SERVICE_USE_MOCK_REPOSITORY`

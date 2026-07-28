@@ -8,6 +8,7 @@ class Settings(BaseSettings):
     service_name: str = "hsp-dispatch-service"
     env: str = "dev"
     log_level: str = "INFO"
+    log_dir: str = "/root/hsp/logs"
 
     grpc_host: str = "0.0.0.0"
     grpc_port: int = 50051

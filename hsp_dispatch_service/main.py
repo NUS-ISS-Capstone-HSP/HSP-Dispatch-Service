@@ -9,7 +9,7 @@ from hsp_dispatch_service.logging import configure_json_logging
 
 async def run() -> None:
     container = await build_container()
-    configure_json_logging(container.settings.log_level)
+    configure_json_logging(container.settings.log_level, container.settings.log_dir)
     await container.grpc_server.start()
 
     http_config = uvicorn.Config(
