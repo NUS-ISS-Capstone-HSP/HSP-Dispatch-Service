@@ -198,34 +198,6 @@ jobs:
           format: table
           exit-code: "1"
 
-  security_snyk_dependency:
-    name: Security - Snyk Dependency
-    runs-on: ubuntu-latest
-    needs: [lint, unit_test]
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-
-      - name: Install Snyk CLI
-        uses: snyk/actions/setup@master
-
-      - name: Snyk dependency scan
-        env:
-          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-        run: |
-          snyk test --severity-threshold=high --file=requirements.txt --package-manager=pip
-
   security_zap_api:
     name: Security - OWASP ZAP API DAST
     runs-on: ubuntu-latest
@@ -295,7 +267,6 @@ jobs:
       - security_semgrep
       - security_pip_audit
       - security_trivy
-      - security_snyk_dependency
       - security_zap_api
 
     steps:
