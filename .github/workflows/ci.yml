@@ -303,7 +303,9 @@ jobs:
         run: |
           REPO_NAME="${GITHUB_REPOSITORY##*/}"
           REPO_NAME="${REPO_NAME,,}"
-          snyk container test "local/${REPO_NAME}:${GITHUB_SHA}" --severity-threshold=high
+          snyk container test "local/${REPO_NAME}:${GITHUB_SHA}" \
+            --file=Dockerfile \
+            --severity-threshold=high
 
   push_image:
     name: Push Docker Image
