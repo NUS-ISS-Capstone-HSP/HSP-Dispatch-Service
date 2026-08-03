@@ -1,3 +1,4 @@
+import logging
 from datetime import UTC, datetime
 
 from hsp_dispatch_service.domain.errors import (
@@ -13,7 +14,10 @@ from hsp_dispatch_service.domain.models import (
     WorkerResponse,
 )
 from hsp_dispatch_service.integration.interfaces import OrderClient, WorkerScheduleClient
+from hsp_dispatch_service.logging import log_event
 from hsp_dispatch_service.repository.interfaces import DispatchRepository
+
+logger = logging.getLogger(__name__)
 
 
 class DispatchService:
@@ -180,14 +184,24 @@ class DispatchService:
     async def _safe_mark_order_pending(self, order_id: str) -> None:
         try:
             await self._order_client.mark_order_pending_assignment(order_id)
-        except Exception:
-            pass
+        except Exception as exc:
+            log_event(
+                logger,
+                logging.ERROR,
+                "dispatch.compensation.order_pending_failed",
+                error_type=type(exc).__name__,
+            )
 
     async def _safe_revert_pending(self, dispatch_id: str) -> None:
         try:
             await self._repository.revert_to_pending(dispatch_id)
-        except Exception:
-            pass
+        except Exception as exc:
+            log_event(
+                logger,
+                logging.ERROR,
+                "dispatch.compensation.revert_pending_failed",
+                error_type=type(exc).__name__,
+            )
 
 
 def _normalize_required(value: str, field_name: str) -> str:
