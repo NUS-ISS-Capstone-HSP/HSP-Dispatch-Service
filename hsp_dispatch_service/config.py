@@ -3,17 +3,16 @@ from functools import lru_cache
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-# 看似是写死，其实是读取了环境变量，这些写死的值只是默认值。
 class Settings(BaseSettings):
     service_name: str = "hsp-dispatch-service"
     env: str = "dev"
     log_level: str = "INFO"
     log_dir: str = "/root/hsp/logs"
 
-    grpc_host: str = "0.0.0.0"
+    grpc_host: str = "127.0.0.1"
     grpc_port: int = 50051
 
-    http_host: str = "0.0.0.0"
+    http_host: str = "127.0.0.1"
     http_port: int = 8080
 
     use_mock_repository: bool = False
